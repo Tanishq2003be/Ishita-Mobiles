@@ -1,0 +1,46 @@
+[
+  {
+    "id": "1",
+    "name": "Galaxy S Ultrafeknfkedenkcec",
+    "series": "S Series",
+    "tagline": "The ultimate Galaxy experience",
+    "price": 129999,
+    "display": "6.8-inch AMOLED",
+    "camera": "200 MP",
+    "battery": "5000 mAh",
+    "processor": "Flagship chipset",
+    "storage": "256 GB",
+    "color": "Titanium Violet",
+    "image": "/images/s-ultra.png",
+    "value": "Galaxy S Ultrafeknfkek"
+  },
+  {
+    "id": "2",
+    "name": "Galaxy Z Fold",
+    "series": "Z Series",
+    "tagline": "A tablet that fits in your pocket",
+    "price": 164999,
+    "display": "7.6-inch Foldable",
+    "camera": "50 MP",
+    "battery": "4400 mAh",
+    "processor": "Flagship chipset",
+    "storage": "512 GB",
+    "color": "Icy Blue",
+    "image": "/images/z-fold.png"
+  },
+  {
+    "id": "3",
+    "name": "Galaxy A Pro",
+    "series": "A Series",
+    "tagline": "Awesome in every detail",
+    "price": 45999,
+    "display": "6.6-inch AMOLED",
+    "camera": "50 MP",
+    "battery": "5000 mAh",
+    "processor": "Octa-core chipset",
+    "storage": "128 GB",
+    "color": "Awesome Mint",
+    "image": "/images/a-pro.png",
+    "value": "Awesome Mintw"
+  }
+]
