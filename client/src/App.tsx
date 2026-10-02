@@ -90,9 +90,14 @@ type Toast = {
 
 const ADMIN_STORAGE_KEY = "galaxy_admin_key";
 
-const API_BASE_URL =
+const rawApiBaseUrl =
   (import.meta as ImportMeta & { env: { VITE_API_BASE_URL?: string } }).env
     .VITE_API_BASE_URL || "";
+
+const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, "");
+
+const apiUrl = (path: string) =>
+  `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 
 const emptyMobileForm: MobileForm = {
   name: "",
@@ -159,7 +164,7 @@ const getImageUrl = (image: string) => {
     return image;
   }
 
-  return `${API_BASE_URL}${image.startsWith("/") ? image : `/${image}`}`;
+  return apiUrl(image);
 };
 
 const getPhoneTheme = (series: string) => {
@@ -583,7 +588,7 @@ function Layout({ children }: { children: ReactNode }) {
             </motion.div>
           )}
         </AnimatePresence>
-            </header>
+      </header>
 
       <div className="relative z-10 pt-24">{children}</div>
 
@@ -593,7 +598,11 @@ function Layout({ children }: { children: ReactNode }) {
             <div className="grid gap-8 lg:grid-cols-[auto_1fr_auto] lg:items-center">
               <motion.div
                 animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
                 className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30"
               >
                 <MapPin size={28} />
@@ -689,8 +698,8 @@ function Shop() {
       setError("");
 
       const [phonesData, reviewsData] = await Promise.all([
-        api<Phone[]>(`${API_BASE_URL}/api/phones`),
-        api<Review[]>(`${API_BASE_URL}/api/reviews`),
+        api<Phone[]>(apiUrl("/api/phones")),
+        api<Review[]>(apiUrl("/api/reviews")),
       ]);
 
       setPhones(phonesData);
@@ -734,7 +743,7 @@ function Shop() {
       setReviewSubmitting(true);
       setError("");
 
-      await api<Review>(`${API_BASE_URL}/api/reviews`, {
+      await api<Review>(apiUrl("/api/reviews"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reviewForm),
@@ -1307,7 +1316,7 @@ function AdminLogin() {
       setIsSubmitting(true);
       setError("");
 
-      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+      const response = await fetch(apiUrl("/api/admin/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ adminKey: adminKey.trim() }),
@@ -1429,7 +1438,7 @@ function AdminPage() {
     try {
       setMessage("");
 
-      const phonesData = await api<Phone[]>(`${API_BASE_URL}/api/phones`);
+      const phonesData = await api<Phone[]>(apiUrl("/api/phones"));
       setPhones(phonesData);
     } catch (loadError) {
       setMessage(
@@ -1521,7 +1530,7 @@ function AdminPage() {
       }
 
       if (isEditing && editId) {
-        await api<Phone>(`${API_BASE_URL}/api/phones/${editId}`, {
+        await api<Phone>(apiUrl(`/api/phones/${editId}`), {
           method: "PUT",
           headers: { "x-admin-key": getAdminKey() },
           body: formData,
@@ -1529,7 +1538,7 @@ function AdminPage() {
 
         pushToast("Mobile updated successfully");
       } else {
-        await api<Phone>(`${API_BASE_URL}/api/phones`, {
+        await api<Phone>(apiUrl("/api/phones"), {
           method: "POST",
           headers: { "x-admin-key": getAdminKey() },
           body: formData,
@@ -1568,7 +1577,7 @@ function AdminPage() {
       setDeletingId(phoneId);
       setMessage("");
 
-      await api<null>(`${API_BASE_URL}/api/phones/${phoneId}`, {
+      await api<null>(apiUrl(`/api/phones/${phoneId}`), {
         method: "DELETE",
         headers: { "x-admin-key": getAdminKey() },
       });
