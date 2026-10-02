@@ -2,12 +2,12 @@ import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import fs from "fs";
+import mongoose from "mongoose";
+import { GridFSBucket, ObjectId } from "mongodb";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 dotenv.config({
   path: path.join(__dirname, ".env"),
@@ -15,19 +15,92 @@ dotenv.config({
 });
 
 const app = express();
-const PORT = 4000;
-
-const phonesFile = path.join(__dirname, "data", "phones.json");
-const reviewsFile = path.join(__dirname, "data", "reviews.json");
+const PORT = process.env.PORT || 4000;
 
 const ADMIN_KEY = process.env.ADMIN_KEY?.trim();
+const MONGODB_URI = process.env.MONGODB_URI?.trim();
 
 if (!ADMIN_KEY) {
   console.error("ADMIN_KEY is missing from server/.env");
   process.exit(1);
 }
 
-console.log("Admin key loaded:", `${ADMIN_KEY.slice(0, 3)}***`);
+if (!MONGODB_URI) {
+  console.error("MONGODB_URI is missing from server/.env");
+  process.exit(1);
+}
+
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://your-project.vercel.app"],
+  }),
+);
+
+app.use(express.json());
+
+let cachedConnection = null;
+let gridFsBucket;
+
+const connectToDatabase = async () => {
+  if (cachedConnection) {
+    return cachedConnection;
+  }
+
+  cachedConnection = await mongoose.connect(MONGODB_URI, {
+    maxPoolSize: 5,
+    serverSelectionTimeoutMS: 5000,
+    bufferCommands: false,
+  });
+
+  gridFsBucket = new GridFSBucket(mongoose.connection.db, {
+    bucketName: "images",
+  });
+
+  console.log("Connected to MongoDB Atlas");
+  console.log("GridFS bucket ready");
+
+  return cachedConnection;
+};
+
+await connectToDatabase();
+
+const phoneSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    series: { type: String, required: true },
+    tagline: { type: String, default: "" },
+    price: { type: Number, required: true },
+    display: { type: String, required: true },
+    camera: { type: String, required: true },
+    battery: { type: String, required: true },
+    processor: { type: String, required: true },
+    storage: { type: String, required: true },
+    color: { type: String, required: true },
+    imageId: { type: String, required: true },
+  },
+  { timestamps: true },
+);
+
+const reviewSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    model: { type: String, required: true },
+    rating: { type: Number, required: true },
+    text: { type: String, required: true },
+  },
+  { timestamps: true },
+);
+
+const Phone = mongoose.model("Phone", phoneSchema);
+const Review = mongoose.model("Review", reviewSchema);
+
+const upload = multer({
+storage: multer.memoryStorage(),
+limits: { fileSize: 4 * 1024 * 1024 },
+fileFilter: (_, file, cb) => {
+cb(null, file.mimetype.startsWith("image/"));
+},
+});
 
 const requireAdmin = (req, res, next) => {
   const adminKey = String(req.headers["x-admin-key"] || "").trim();
@@ -40,62 +113,181 @@ const requireAdmin = (req, res, next) => {
 
   next();
 };
-app.use(cors());
-app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-const read = (f) => JSON.parse(fs.readFileSync(f, "utf8")),
-  write = (f, d) => fs.writeFileSync(f, JSON.stringify(d, null, 2));
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, "uploads"),
-  filename: (_, file, cb) =>
-    cb(
-      null,
-      Date.now() + "-" + file.originalname.replace(/[^a-zA-Z0-9.-]/g, "-"),
-    ),
+
+const uploadImageToGridFs = (file) =>
+  new Promise((resolve, reject) => {
+    const uploadStream = gridFsBucket.openUploadStream(file.originalname, {
+      contentType: file.mimetype,
+    });
+
+    uploadStream.end(file.buffer);
+
+    uploadStream.on("finish", () => {
+      resolve(uploadStream.id.toString());
+    });
+
+    uploadStream.on("error", reject);
+  });
+
+const deleteImageFromGridFs = async (imageId) => {
+  try {
+    await gridFsBucket.delete(new ObjectId(imageId));
+  } catch {
+    // Image already missing, ignore
+  }
+};
+
+const toPhoneResponse = (phoneDoc) => ({
+  id: phoneDoc._id.toString(),
+  name: phoneDoc.name,
+  series: phoneDoc.series,
+  tagline: phoneDoc.tagline,
+  price: phoneDoc.price,
+  display: phoneDoc.display,
+  camera: phoneDoc.camera,
+  battery: phoneDoc.battery,
+  processor: phoneDoc.processor,
+  storage: phoneDoc.storage,
+  color: phoneDoc.color,
+  image: `/api/images/${phoneDoc.imageId}`,
 });
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_, f, cb) => cb(null, f.mimetype.startsWith("image/")),
+
+const toReviewResponse = (reviewDoc) => ({
+  id: reviewDoc._id.toString(),
+  name: reviewDoc.name,
+  model: reviewDoc.model,
+  rating: reviewDoc.rating,
+  text: reviewDoc.text,
 });
-app.get("/api/health", (_, res) => res.json({ ok: true }));
-app.get("/api/phones", (_, res) => res.json(read(phonesFile)));
-app.post("/api/phones", requireAdmin, upload.single("image"), (req, res) => {
-  const list = read(phonesFile),
-    phone = {
-      id: crypto.randomUUID(),
-      ...req.body,
-      price: Number(req.body.price),
-      image: req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl,
-    };
-  if (!phone.name || !phone.image)
-    return res.status(400).json({ message: "Name and image are required" });
-  list.push(phone);
-  write(phonesFile, list);
-  res.status(201).json(phone);
+
+app.get("/api/health", (_, res) => {
+  res.json({ ok: true });
 });
-app.put("/api/phones/:id", requireAdmin, upload.single("image"), (req, res) => {
-  const list = read(phonesFile),
-    i = list.findIndex((x) => x.id === req.params.id);
-  if (i < 0) return res.sendStatus(404);
-  list[i] = {
-    ...list[i],
-    ...req.body,
-    price: Number(req.body.price || list[i].price),
-    image: req.file
-      ? `/uploads/${req.file.filename}`
-      : req.body.imageUrl || list[i].image,
-  };
-  write(phonesFile, list);
-  res.json(list[i]);
+
+app.get("/api/images/:id", async (req, res) => {
+  try {
+    const fileId = new ObjectId(req.params.id);
+
+    const files = await gridFsBucket.find({ _id: fileId }).toArray();
+
+    if (!files.length) {
+      return res.sendStatus(404);
+    }
+
+    res.set("Content-Type", files[0].contentType);
+    gridFsBucket.openDownloadStream(fileId).pipe(res);
+  } catch {
+    res.sendStatus(404);
+  }
 });
+
+app.get("/api/phones", async (_, res) => {
+  const phones = await Phone.find().sort({ createdAt: -1 });
+  res.json(phones.map(toPhoneResponse));
+});
+
+app.post(
+  "/api/phones",
+  requireAdmin,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          message: "Mobile image is required",
+        });
+      }
+
+      const imageId = await uploadImageToGridFs(req.file);
+
+      const phone = await Phone.create({
+        name: req.body.name,
+        series: req.body.series,
+        tagline: req.body.tagline,
+        price: Number(req.body.price),
+        display: req.body.display,
+        camera: req.body.camera,
+        battery: req.body.battery,
+        processor: req.body.processor,
+        storage: req.body.storage,
+        color: req.body.color,
+        imageId,
+      });
+
+      res.status(201).json(toPhoneResponse(phone));
+    } catch (error) {
+      res.status(500).json({
+        message: "Unable to add mobile",
+      });
+    }
+  },
+);
+
+app.put(
+  "/api/phones/:id",
+  requireAdmin,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const phone = await Phone.findById(req.params.id);
+
+      if (!phone) {
+        return res.status(404).json({
+          message: "Mobile not found",
+        });
+      }
+
+      let imageId = phone.imageId;
+
+      if (req.file) {
+        await deleteImageFromGridFs(phone.imageId);
+        imageId = await uploadImageToGridFs(req.file);
+      }
+
+      phone.name = req.body.name || phone.name;
+      phone.series = req.body.series || phone.series;
+      phone.tagline = req.body.tagline ?? phone.tagline;
+      phone.price = req.body.price ? Number(req.body.price) : phone.price;
+      phone.display = req.body.display || phone.display;
+      phone.camera = req.body.camera || phone.camera;
+      phone.battery = req.body.battery || phone.battery;
+      phone.processor = req.body.processor || phone.processor;
+      phone.storage = req.body.storage || phone.storage;
+      phone.color = req.body.color || phone.color;
+      phone.imageId = imageId;
+
+      await phone.save();
+
+      res.json(toPhoneResponse(phone));
+    } catch (error) {
+      res.status(500).json({
+        message: "Unable to update mobile",
+      });
+    }
+  },
+);
+
+app.delete("/api/phones/:id", requireAdmin, async (req, res) => {
+  try {
+    const phone = await Phone.findById(req.params.id);
+
+    if (!phone) {
+      return res.sendStatus(404);
+    }
+
+    await deleteImageFromGridFs(phone.imageId);
+    await phone.deleteOne();
+
+    res.sendStatus(204);
+  } catch (error) {
+    res.status(500).json({
+      message: "Unable to delete mobile",
+    });
+  }
+});
+
 app.post("/api/admin/login", (req, res) => {
   const adminKey = String(req.body?.adminKey || "").trim();
-
-  console.log(
-    "Admin login attempt:",
-    `${adminKey.slice(0, 3)}***`,
-  );
 
   if (!adminKey || adminKey !== ADMIN_KEY) {
     return res.status(401).json({
@@ -103,62 +295,37 @@ app.post("/api/admin/login", (req, res) => {
     });
   }
 
-  return res.status(200).json({
-    authenticated: true,
+  res.json({ authenticated: true });
+});
+
+app.get("/api/reviews", async (_, res) => {
+  const reviews = await Review.find().sort({ createdAt: -1 });
+  res.json(reviews.map(toReviewResponse));
+});
+
+app.post("/api/reviews", async (req, res) => {
+  const { name, model, rating, text } = req.body;
+
+  if (!name || !text) {
+    return res.status(400).json({
+      message: "Name and review are required",
+    });
+  }
+
+  const review = await Review.create({
+    name,
+    model,
+    rating: Number(rating),
+    text,
   });
+
+  res.status(201).json(toReviewResponse(review));
 });
-app.put(
-  "/api/phones/:id",
-  requireAdmin,
-  upload.single("image"),
-  (req, res) => {
-    const list = read(phonesFile);
-    const index = list.findIndex(
-      (phone) => phone.id === req.params.id,
-    );
 
-    if (index < 0) {
-      return res.status(404).json({
-        message: "Mobile not found",
-      });
-    }
+if (process.env.VERCEL !== "1") {
+  app.listen(PORT, () => {
+    console.log(`API running on port ${PORT}`);
+  });
+}
 
-    list[index] = {
-      ...list[index],
-      ...req.body,
-      price: Number(
-        req.body.price || list[index].price,
-      ),
-      image: req.file
-        ? `/uploads/${req.file.filename}`
-        : list[index].image,
-    };
-
-    write(phonesFile, list);
-
-    return res.json(list[index]);
-  },
-);
-app.delete("/api/phones/:id", requireAdmin, (req, res) => {
-  const list = read(phonesFile).filter((x) => x.id !== req.params.id);
-  write(phonesFile, list);
-  res.sendStatus(204);
-});
-app.get("/api/reviews", (_, res) => res.json(read(reviewsFile)));
-app.post("/api/reviews", (req, res) => {
-  const list = read(reviewsFile),
-    review = {
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      ...req.body,
-      rating: Number(req.body.rating),
-    };
-  if (!review.name || !review.text)
-    return res.status(400).json({ message: "Name and review are required" });
-  list.unshift(review);
-  write(reviewsFile, list);
-  res.status(201).json(review);
-});
-app.listen(PORT, "127.0.0.1", () =>
-  console.log(`API running at http://127.0.0.1:${PORT}`),
-);
+export default app;

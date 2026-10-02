@@ -4,6 +4,7 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
@@ -11,18 +12,21 @@ import {
   AnimatePresence,
   motion,
   useMotionValue,
+  useScroll,
   useSpring,
   useTransform,
 } from "framer-motion";
 import {
   ArrowRight,
   Check,
+  CheckCircle2,
   ChevronRight,
+  Clock,
   Cpu,
+  MapPin,
   Menu,
   Pencil,
   Plus,
-  Search,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -79,7 +83,16 @@ type ApiError = {
   message?: string;
 };
 
+type Toast = {
+  id: number;
+  text: string;
+};
+
 const ADMIN_STORAGE_KEY = "galaxy_admin_key";
+
+const API_BASE_URL =
+  (import.meta as ImportMeta & { env: { VITE_API_BASE_URL?: string } }).env
+    .VITE_API_BASE_URL || "";
 
 const emptyMobileForm: MobileForm = {
   name: "",
@@ -146,43 +159,171 @@ const getImageUrl = (image: string) => {
     return image;
   }
 
-  return image.startsWith("/") ? image : `/${image}`;
+  return `${API_BASE_URL}${image.startsWith("/") ? image : `/${image}`}`;
 };
 
 const getPhoneTheme = (series: string) => {
   if (series === "S Series") {
     return {
       gradient: "from-blue-400 via-indigo-500 to-violet-600",
-      glow: "rgba(99, 102, 241, 0.42)",
+      glow: "rgba(99, 102, 241, 0.45)",
+      text: "text-blue-400",
     };
   }
 
   if (series === "Z Series") {
     return {
       gradient: "from-fuchsia-400 via-violet-500 to-indigo-600",
-      glow: "rgba(217, 70, 239, 0.38)",
+      glow: "rgba(217, 70, 239, 0.4)",
+      text: "text-fuchsia-400",
     };
   }
 
   if (series === "A Series") {
     return {
       gradient: "from-emerald-400 via-teal-500 to-cyan-500",
-      glow: "rgba(16, 185, 129, 0.38)",
+      glow: "rgba(16, 185, 129, 0.4)",
+      text: "text-emerald-400",
     };
   }
 
   if (series === "M Series") {
     return {
       gradient: "from-orange-400 via-rose-500 to-pink-600",
-      glow: "rgba(244, 63, 94, 0.38)",
+      glow: "rgba(244, 63, 94, 0.4)",
+      text: "text-orange-400",
     };
   }
 
   return {
     gradient: "from-cyan-400 via-blue-500 to-indigo-600",
-    glow: "rgba(6, 182, 212, 0.38)",
+    glow: "rgba(6, 182, 212, 0.4)",
+    text: "text-cyan-400",
   };
 };
+
+function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const pushToast = (text: string) => {
+    const id = Date.now();
+
+    setToasts((current) => [...current, { id, text }]);
+
+    setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 3200);
+  };
+
+  return { toasts, pushToast };
+}
+
+function ToastStack({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="pointer-events-none fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 flex-col items-center gap-2">
+      <AnimatePresence>
+        {toasts.map((toast) => (
+          <motion.div
+            key={toast.id}
+            initial={{ opacity: 0, y: 30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            className="flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-5 py-3 text-sm font-bold text-emerald-200 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl"
+          >
+            <CheckCircle2 size={16} />
+            {toast.text}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 25,
+    restDelta: 0.001,
+  });
+
+  return (
+    <motion.div
+      style={{ scaleX }}
+      className="fixed inset-x-0 top-0 z-[60] h-[3px] origin-left bg-gradient-to-r from-blue-400 via-indigo-500 to-violet-500"
+    />
+  );
+}
+
+function AmbientBackground() {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      <motion.div
+        animate={{
+          x: [0, 80, -40, 0],
+          y: [0, -60, 40, 0],
+          scale: [1, 1.15, 0.95, 1],
+        }}
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-[8%] top-[10%] h-96 w-96 rounded-full bg-blue-600/20 blur-[110px]"
+      />
+
+      <motion.div
+        animate={{
+          x: [0, -70, 50, 0],
+          y: [0, 50, -30, 0],
+          scale: [1, 0.9, 1.1, 1],
+        }}
+        transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute right-[5%] top-[30%] h-[28rem] w-[28rem] rounded-full bg-violet-600/15 blur-[130px]"
+      />
+
+      <motion.div
+        animate={{
+          x: [0, 50, -60, 0],
+          y: [0, -40, 30, 0],
+        }}
+        transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-[5%] left-[25%] h-80 w-80 rounded-full bg-cyan-500/10 blur-[120px]"
+      />
+
+      <div
+        className="absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px)",
+          backgroundSize: "72px 72px",
+        }}
+      />
+    </div>
+  );
+}
+
+function RevealSection({
+  id,
+  children,
+  className = "",
+  delay = 0,
+}: {
+  id?: string;
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 48 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+      id={id}
+      className={className}
+    >
+      {children}
+    </motion.section>
+  );
+}
 
 function MagneticPhone({
   phone,
@@ -226,7 +367,7 @@ function MagneticPhone({
       className={`relative mx-auto ${compact ? "h-64" : "h-[440px]"}`}
     >
       <motion.div
-        animate={{ scale: [1, 1.16, 1], opacity: [0.2, 0.42, 0.2] }}
+        animate={{ scale: [1, 1.16, 1], opacity: [0.2, 0.45, 0.2] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         className={`absolute inset-[15%] rounded-full bg-gradient-to-br ${theme.gradient} blur-[65px]`}
       />
@@ -240,7 +381,6 @@ function MagneticPhone({
       {imageUrl ? (
         <img
           src={imageUrl}
-          alt=""
           onError={(event) => {
             if (event?.currentTarget) {
               event.currentTarget.style.display = "none";
@@ -276,40 +416,32 @@ function Layout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#05060a] text-white selection:bg-indigo-500/40">
-      <div
-        className="pointer-events-none fixed inset-0 z-0"
-        style={{
-          background:
-            "radial-gradient(circle at 20% 10%, rgba(59,130,246,0.11), transparent 30%), radial-gradient(circle at 90% 25%, rgba(168,85,247,0.1), transparent 28%)",
-        }}
-      />
-
-      <div
-        className="pointer-events-none fixed inset-0 z-0 opacity-[0.045]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px)",
-          backgroundSize: "72px 72px",
-        }}
-      />
+    <div className="relative min-h-screen overflow-x-hidden bg-[#05060a] text-white selection:bg-indigo-500/40">
+      <ScrollProgress />
+      <AmbientBackground />
 
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between rounded-2xl border border-white/10 bg-black/60 px-4 py-3 shadow-2xl shadow-black/30 backdrop-blur-2xl sm:px-5">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="mx-auto flex max-w-7xl items-center justify-between rounded-2xl border border-white/10 bg-black/60 px-4 py-3 shadow-2xl shadow-black/30 backdrop-blur-2xl sm:px-5"
+        >
           <Link to="/" className="flex items-center gap-3">
             <motion.span
-              whileHover={{ rotate: -8, scale: 1.08 }}
+              whileHover={{ rotate: -10, scale: 1.1 }}
+              whileTap={{ scale: 0.92 }}
               className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/25"
             >
               <Zap size={19} />
             </motion.span>
 
             <span>
-              <b className="block text-left text-lg tracking-[0.22em]">
-                Ishita
+              <b className="block text-left text-sm tracking-[0.22em]">
+                ISHITA
               </b>
-              <small className="block text-[16px] tracking-[0.18em] text-slate-500">
-                Mobiles
+              <small className="block text-[9px] tracking-[0.18em] text-slate-500">
+                MOBILES
               </small>
             </span>
           </Link>
@@ -317,7 +449,7 @@ function Layout({ children }: { children: ReactNode }) {
           <nav className="hidden items-center gap-7 text-sm text-slate-300 md:flex">
             <Link
               to="/"
-              className="relative transition hover:text-white after:absolute after:-bottom-2 after:left-0 after:h-px after:w-0 after:bg-blue-400 after:transition-all hover:after:w-full"
+              className="relative transition hover:text-white after:absolute after:-bottom-2 after:left-0 after:h-px after:w-0 after:bg-blue-400 after:transition-all after:duration-300 hover:after:w-full"
             >
               Shop
             </Link>
@@ -325,7 +457,7 @@ function Layout({ children }: { children: ReactNode }) {
             {isAdmin && (
               <Link
                 to="/admin"
-                className="relative transition hover:text-white after:absolute after:-bottom-2 after:left-0 after:h-px after:w-0 after:bg-blue-400 after:transition-all hover:after:w-full"
+                className="relative transition hover:text-white after:absolute after:-bottom-2 after:left-0 after:h-px after:w-0 after:bg-blue-400 after:transition-all after:duration-300 hover:after:w-full"
               >
                 Manage mobiles
               </Link>
@@ -335,40 +467,75 @@ function Layout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2">
             {isAdmin ? (
               <>
-                <Link
-                  to="/admin"
-                  className="hidden items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-black transition hover:scale-[1.03] sm:flex"
+                <motion.div
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
                 >
-                  <Pencil size={16} />
-                  Manage
-                </Link>
+                  <Link
+                    to="/admin"
+                    className="hidden items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-black sm:flex"
+                  >
+                    <Pencil size={16} />
+                    Manage
+                  </Link>
+                </motion.div>
 
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
                   type="button"
                   onClick={handleLogout}
                   className="hidden rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/10 sm:block"
                 >
                   Logout
-                </button>
+                </motion.button>
               </>
             ) : (
-              <Link
-                to="/admin/login"
-                className="hidden rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/10 sm:block"
+              <motion.div
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
               >
-                Admin
-              </Link>
+                <Link
+                  to="/admin/login"
+                  className="hidden rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/10 sm:block"
+                >
+                  Admin
+                </Link>
+              </motion.div>
             )}
 
-            <button
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               type="button"
               onClick={() => setMenuOpen((current) => !current)}
               className="rounded-xl border border-white/10 p-2.5 md:hidden"
             >
-              {menuOpen ? <X /> : <Menu />}
-            </button>
+              <AnimatePresence mode="wait" initial={false}>
+                {menuOpen ? (
+                  <motion.span
+                    key="close"
+                    initial={{ rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <X />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="open"
+                    initial={{ rotate: 90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: -90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Menu />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
 
         <AnimatePresence>
           {menuOpen && (
@@ -416,9 +583,85 @@ function Layout({ children }: { children: ReactNode }) {
             </motion.div>
           )}
         </AnimatePresence>
-      </header>
+            </header>
 
       <div className="relative z-10 pt-24">{children}</div>
+
+      <footer className="relative z-10 mt-10 border-t border-white/10 bg-gradient-to-b from-transparent to-black/40">
+        <div className="mx-auto max-w-7xl px-5 py-16">
+          <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-8 sm:p-10">
+            <div className="grid gap-8 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30"
+              >
+                <MapPin size={28} />
+              </motion.div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-400">
+                  Visit our store
+                </p>
+
+                <h3 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
+                  Samsung Experience Store
+                </h3>
+
+                <p className="mt-2 text-lg font-medium text-slate-400">
+                  Near Shastri Nursing Home, Mawana, Uttar Pradesh
+                </p>
+
+                <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+                  <Clock size={15} />
+                  Open daily · 10:00 AM - 8:00 PM
+                </div>
+              </div>
+
+              <motion.a
+                href="https://www.google.com/maps/search/?api=1&query=Shastri+Nursing+Home+Mawana+Samsung+Experience+Store"
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-full bg-white px-6 py-3.5 font-black text-black shadow-xl transition hover:bg-blue-50"
+              >
+                <MapPin size={17} />
+                Get directions
+              </motion.a>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col items-center justify-between gap-3 text-sm text-slate-500 sm:flex-row">
+            <span className="font-semibold text-slate-300">Ishita Mobiles</span>
+            <span>© {new Date().getFullYear()} All rights reserved.</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function PhoneCardSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-center justify-between">
+        <div className="h-5 w-20 animate-pulse rounded-full bg-white/10" />
+        <div className="h-5 w-10 animate-pulse rounded-full bg-white/10" />
+      </div>
+
+      <div className="relative my-6 h-64 overflow-hidden rounded-2xl bg-white/5">
+        <motion.div
+          animate={{ x: ["-100%", "100%"] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        />
+      </div>
+
+      <div className="h-3 w-24 animate-pulse rounded bg-white/10" />
+      <div className="mt-3 h-6 w-40 animate-pulse rounded bg-white/10" />
+      <div className="mt-3 h-10 w-full animate-pulse rounded bg-white/5" />
+      <div className="mt-5 h-12 w-full animate-pulse rounded-xl bg-white/10" />
     </div>
   );
 }
@@ -438,6 +681,7 @@ function Shop() {
     text: "",
   });
 
+  const { toasts, pushToast } = useToasts();
   const isAdmin = isAdminAuthenticated();
 
   const loadData = async () => {
@@ -445,8 +689,8 @@ function Shop() {
       setError("");
 
       const [phonesData, reviewsData] = await Promise.all([
-        api<Phone[]>("/api/phones"),
-        api<Review[]>("/api/reviews"),
+        api<Phone[]>(`${API_BASE_URL}/api/phones`),
+        api<Review[]>(`${API_BASE_URL}/api/reviews`),
       ]);
 
       setPhones(phonesData);
@@ -490,7 +734,7 @@ function Shop() {
       setReviewSubmitting(true);
       setError("");
 
-      await api<Review>("/api/reviews", {
+      await api<Review>(`${API_BASE_URL}/api/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reviewForm),
@@ -503,6 +747,7 @@ function Shop() {
         rating: 5,
       }));
 
+      pushToast("Thank you for your review");
       await loadData();
     } catch (submitError) {
       setError(
@@ -519,63 +764,94 @@ function Shop() {
     .map((id) => phones.find((phone) => phone.id === id))
     .filter((phone): phone is Phone => Boolean(phone));
 
-  if (isLoading) {
-    return (
-      <Layout>
-        <main className="grid min-h-[75vh] place-items-center">
-          <div className="text-center">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-white/10 border-t-blue-500" />
-            <p className="mt-4 text-slate-400">Loading Galaxy mobiles...</p>
-          </div>
-        </main>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
+      <ToastStack toasts={toasts} />
+
       <main className="mx-auto max-w-7xl px-5">
-        <section className="grid min-h-[82vh] items-center gap-10 pb-16 pt-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="flex min-h-[55vh] flex-col items-center justify-center py-16 text-center">
           <motion.div
-            initial={{ opacity: 0, x: -40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.75 }}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/10 px-4 py-2 text-xs font-bold text-blue-200">
-              <Sparkles size={14} />A new dimension of Galaxy
-            </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+              className="mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/10 px-4 py-2 text-xs font-bold text-blue-200"
+            >
+              <motion.span
+                animate={{ rotate: [0, 15, -15, 0] }}
+                transition={{ duration: 2.5, repeat: Infinity }}
+              >
+                <Sparkles size={14} />
+              </motion.span>
+              A new dimension of Galaxy
+            </motion.div>
 
             <h1 className="text-6xl font-black leading-[0.88] tracking-[-0.065em] sm:text-8xl lg:text-[100px]">
-              Beyond
+              {["Beyond"].map((word) => (
+                <motion.span
+                  key={word}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.7 }}
+                  className="inline-block"
+                >
+                  {word}
+                </motion.span>
+              ))}
               <br />
-              <span className="bg-gradient-to-r from-blue-400 via-indigo-500 to-violet-500 bg-clip-text text-transparent">
+              <motion.span
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35, duration: 0.7 }}
+                className="inline-block bg-gradient-to-r from-blue-400 via-indigo-500 to-violet-500 bg-clip-text text-transparent"
+              >
                 ordinary.
-              </span>
+              </motion.span>
             </h1>
 
-            <p className="mt-7 max-w-lg text-lg leading-8 text-slate-400">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              className="mx-auto mt-7 max-w-xl text-lg leading-8 text-slate-400"
+            >
               Explore Samsung mobiles, compare specifications side by side, and
               share your shop experience.
-            </p>
+            </motion.p>
 
-            <div className="mt-9 flex flex-wrap gap-3">
-              <button
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65, duration: 0.6 }}
+              className="mt-9 flex flex-wrap justify-center gap-3"
+            >
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={() =>
                   document
                     .getElementById("collection")
                     ?.scrollIntoView({ behavior: "smooth" })
                 }
-                className="group flex items-center gap-3 rounded-full bg-white px-6 py-3.5 font-black text-black transition hover:scale-105"
+                className="group flex items-center gap-3 rounded-full bg-white px-6 py-3.5 font-black text-black"
               >
                 Explore Galaxy
-                <ArrowRight
-                  className="transition group-hover:translate-x-1"
-                  size={18}
-                />
-              </button>
+                <motion.span
+                  animate={{ x: [0, 4, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <ArrowRight size={18} />
+                </motion.span>
+              </motion.button>
 
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={() =>
                   document
@@ -585,18 +861,25 @@ function Shop() {
                 className="rounded-full border border-white/15 bg-white/5 px-6 py-3.5 font-bold backdrop-blur transition hover:bg-white/10"
               >
                 Compare models
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           </motion.div>
         </section>
 
-        {error && (
-          <div className="mb-8 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-300">
-            {error}
-          </div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-8 overflow-hidden rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-300"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <section id="collection" className="py-16">
+        <RevealSection id="collection" className="py-16">
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-400">
@@ -608,8 +891,18 @@ function Shop() {
             </div>
           </div>
 
-          {phones.length === 0 ? (
-            <div className="mt-12 rounded-3xl border border-dashed border-white/20 p-12 text-center">
+          {isLoading ? (
+            <div className="mt-9 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((index) => (
+                <PhoneCardSkeleton key={index} />
+              ))}
+            </div>
+          ) : phones.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-12 rounded-3xl border border-dashed border-white/20 p-12 text-center"
+            >
               <Smartphone className="mx-auto text-slate-500" size={42} />
               <h3 className="mt-4 text-2xl font-black">No mobiles available</h3>
               <p className="mt-2 text-slate-400">
@@ -625,48 +918,64 @@ function Shop() {
                   Add mobile
                 </Link>
               )}
-            </div>
+            </motion.div>
           ) : (
             <motion.div
-              layout
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: {
+                  transition: { staggerChildren: 0.08 },
+                },
+              }}
               className="mt-9 grid gap-5 md:grid-cols-2 xl:grid-cols-4"
             >
               <AnimatePresence>
-                {phones.map((phone, index) => {
+                {phones.map((phone) => {
                   const theme = getPhoneTheme(phone.series);
 
                   return (
                     <motion.article
                       layout
-                      initial={{ opacity: 0, y: 35, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{
-                        delay: index * 0.06,
-                        type: "spring",
-                        stiffness: 130,
-                        damping: 18,
+                      variants={{
+                        hidden: { opacity: 0, y: 40, scale: 0.94 },
+                        visible: {
+                          opacity: 1,
+                          y: 0,
+                          scale: 1,
+                          transition: {
+                            type: "spring",
+                            stiffness: 140,
+                            damping: 18,
+                          },
+                        },
                       }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      whileHover={{ y: -6 }}
                       key={phone.id}
-                      className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-b from-white/[0.075] to-white/[0.025] p-4 shadow-2xl transition hover:border-white/20"
+                      className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-b from-white/[0.075] to-white/[0.025] p-4 shadow-2xl transition-colors hover:border-white/20"
                       style={{
                         boxShadow: `0 30px 75px -42px ${theme.glow}`,
                       }}
                     >
-                      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+                      <motion.div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition group-hover:opacity-100" />
 
                       <div className="flex items-center justify-between">
                         <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black uppercase tracking-wider">
                           {phone.series}
                         </span>
 
-                        <span className="flex items-center gap-1 text-xs font-bold">
+                        <motion.span
+                          whileHover={{ scale: 1.15 }}
+                          className="flex items-center gap-1 text-xs font-bold"
+                        >
                           <Star
                             size={13}
                             className="fill-amber-400 text-amber-400"
                           />
                           4.9
-                        </span>
+                        </motion.span>
                       </div>
 
                       <MagneticPhone phone={phone} compact />
@@ -694,13 +1003,15 @@ function Shop() {
 
                           <motion.span
                             whileHover={{ rotate: -8, scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
                             className="grid h-11 w-11 place-items-center rounded-full bg-white text-black"
                           >
                             <ChevronRight />
                           </motion.span>
                         </div>
 
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.97 }}
                           type="button"
                           onClick={() => toggleCompare(phone.id)}
                           className={`mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-black transition ${
@@ -709,15 +1020,30 @@ function Shop() {
                               : "border border-white/10 bg-white/[0.06] hover:bg-white/10"
                           }`}
                         >
-                          {compareIds.includes(phone.id) ? (
-                            <>
-                              <Check size={16} />
-                              Selected
-                            </>
-                          ) : (
-                            "Add to comparison"
-                          )}
-                        </button>
+                          <AnimatePresence mode="wait" initial={false}>
+                            {compareIds.includes(phone.id) ? (
+                              <motion.span
+                                key="selected"
+                                initial={{ opacity: 0, scale: 0.7 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.7 }}
+                                className="flex items-center gap-2"
+                              >
+                                <Check size={16} />
+                                Selected
+                              </motion.span>
+                            ) : (
+                              <motion.span
+                                key="add"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                              >
+                                Add to comparison
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                        </motion.button>
 
                         {isAdmin && (
                           <Link
@@ -735,10 +1061,10 @@ function Shop() {
               </AnimatePresence>
             </motion.div>
           )}
-        </section>
+        </RevealSection>
 
         {comparedPhones.length === 2 && (
-          <section id="comparison" className="py-16">
+          <RevealSection id="comparison" className="py-16">
             <div className="text-center">
               <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">
                 Precision comparison
@@ -781,8 +1107,15 @@ function Shop() {
                   key: "storage" as const,
                   icon: ShieldCheck,
                 },
-              ].map((item) => (
-                <div key={item.key} className="border-t border-white/10">
+              ].map((item, index) => (
+                <motion.div
+                  key={item.key}
+                  initial={{ opacity: 0, x: -10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.05 }}
+                  className="border-t border-white/10"
+                >
                   <div className="flex items-center justify-center gap-2 bg-white/[0.025] py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                     <item.icon size={14} />
                     {item.label}
@@ -798,13 +1131,13 @@ function Shop() {
                       </div>
                     ))}
                   </div>
-                </div>
+                </motion.div>
               ))}
             </motion.div>
-          </section>
+          </RevealSection>
         )}
 
-        <section className="grid gap-10 py-24 lg:grid-cols-2">
+        <RevealSection className="grid gap-10 py-24 lg:grid-cols-2">
           <form
             onSubmit={submitReview}
             className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8"
@@ -857,7 +1190,9 @@ function Shop() {
 
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((rating) => (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.25, rotate: -8 }}
+                    whileTap={{ scale: 0.9 }}
                     type="button"
                     key={rating}
                     aria-label={`${rating} star rating`}
@@ -872,7 +1207,7 @@ function Shop() {
                           : "text-slate-600"
                       }
                     />
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>
@@ -891,13 +1226,15 @@ function Shop() {
               className="w-full resize-none rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-violet-500"
             />
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={reviewSubmitting || phones.length === 0}
               className="w-full rounded-xl bg-violet-600 p-3 font-bold transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {reviewSubmitting ? "Submitting..." : "Submit review"}
-            </button>
+            </motion.button>
           </form>
 
           <div>
@@ -912,11 +1249,12 @@ function Shop() {
                 {reviews.map((review, index) => (
                   <motion.article
                     key={review.id}
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: 24 }}
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: index * 0.06 }}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                    whileHover={{ x: -4 }}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-5 transition-colors hover:border-white/20"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -949,7 +1287,7 @@ function Shop() {
               </div>
             )}
           </div>
-        </section>
+        </RevealSection>
       </main>
     </Layout>
   );
@@ -969,7 +1307,7 @@ function AdminLogin() {
       setIsSubmitting(true);
       setError("");
 
-      const response = await fetch("/api/admin/login", {
+      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ adminKey: adminKey.trim() }),
@@ -1003,13 +1341,20 @@ function AdminLogin() {
   return (
     <Layout>
       <main className="grid min-h-[75vh] place-items-center px-5 py-16">
-        <form
+        <motion.form
+          initial={{ opacity: 0, y: 30, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           onSubmit={handleLogin}
           className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-7 sm:p-9"
         >
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-600">
+          <motion.div
+            animate={{ rotate: [0, -6, 6, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-600"
+          >
             <Smartphone size={22} />
-          </div>
+          </motion.div>
 
           <h1 className="mt-6 text-3xl font-black">Administrator login</h1>
 
@@ -1027,15 +1372,28 @@ function AdminLogin() {
             className="mt-7 w-full rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
-          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+          <AnimatePresence>
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3 text-sm text-red-400"
+              >
+                {error}
+              </motion.p>
+            )}
+          </AnimatePresence>
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={isSubmitting}
             className="mt-5 w-full rounded-xl bg-blue-600 p-3 font-bold transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? "Signing in..." : "Login as admin"}
-          </button>
+          </motion.button>
 
           <Link
             to="/"
@@ -1043,7 +1401,7 @@ function AdminLogin() {
           >
             Return to shop
           </Link>
-        </form>
+        </motion.form>
       </main>
     </Layout>
   );
@@ -1065,11 +1423,13 @@ function AdminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState("");
 
+  const { toasts, pushToast } = useToasts();
+
   const loadPhones = async () => {
     try {
       setMessage("");
 
-      const phonesData = await api<Phone[]>("/api/phones");
+      const phonesData = await api<Phone[]>(`${API_BASE_URL}/api/phones`);
       setPhones(phonesData);
     } catch (loadError) {
       setMessage(
@@ -1161,17 +1521,21 @@ function AdminPage() {
       }
 
       if (isEditing && editId) {
-        await api<Phone>(`/api/phones/${editId}`, {
+        await api<Phone>(`${API_BASE_URL}/api/phones/${editId}`, {
           method: "PUT",
           headers: { "x-admin-key": getAdminKey() },
           body: formData,
         });
+
+        pushToast("Mobile updated successfully");
       } else {
-        await api<Phone>("/api/phones", {
+        await api<Phone>(`${API_BASE_URL}/api/phones`, {
           method: "POST",
           headers: { "x-admin-key": getAdminKey() },
           body: formData,
         });
+
+        pushToast("Mobile added successfully");
       }
 
       navigate("/");
@@ -1204,7 +1568,7 @@ function AdminPage() {
       setDeletingId(phoneId);
       setMessage("");
 
-      await api<null>(`/api/phones/${phoneId}`, {
+      await api<null>(`${API_BASE_URL}/api/phones/${phoneId}`, {
         method: "DELETE",
         headers: { "x-admin-key": getAdminKey() },
       });
@@ -1212,6 +1576,8 @@ function AdminPage() {
       setPhones((current) =>
         current.filter((phoneItem) => phoneItem.id !== phoneId),
       );
+
+      pushToast("Mobile deleted");
 
       if (editId === phoneId) {
         resetForm();
@@ -1239,8 +1605,14 @@ function AdminPage() {
 
   return (
     <Layout>
+      <ToastStack toasts={toasts} />
+
       <main className="mx-auto max-w-6xl px-5 py-16">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start"
+        >
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">
               Admin workspace
@@ -1258,18 +1630,23 @@ function AdminPage() {
           </div>
 
           {isEditing && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               type="button"
               onClick={resetForm}
               className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 font-semibold text-slate-300 transition hover:bg-white/10"
             >
               <X size={18} />
               Cancel editing
-            </button>
+            </motion.button>
           )}
-        </div>
+        </motion.div>
 
-        <form
+        <motion.form
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
           onSubmit={submitMobile}
           className="mt-10 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8 md:grid-cols-2"
         >
@@ -1280,7 +1657,7 @@ function AdminPage() {
             value={form.name}
             onChange={(event) => updateField("name", event.target.value)}
             placeholder="Mobile name"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
           <select
@@ -1288,7 +1665,7 @@ function AdminPage() {
             name="series"
             value={form.series}
             onChange={(event) => updateField("series", event.target.value)}
-            className="rounded-xl border border-white/10 bg-[#111318] p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-[#111318] p-3 outline-none transition focus:border-blue-500"
           >
             <option value="" disabled>
               Select series
@@ -1307,7 +1684,7 @@ function AdminPage() {
             value={form.tagline}
             onChange={(event) => updateField("tagline", event.target.value)}
             placeholder="Tagline"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500 md:col-span-2"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500 md:col-span-2"
           />
 
           <input
@@ -1318,7 +1695,7 @@ function AdminPage() {
             value={form.price}
             onChange={(event) => updateField("price", event.target.value)}
             placeholder="Price in INR"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
           <input
@@ -1328,7 +1705,7 @@ function AdminPage() {
             value={form.color}
             onChange={(event) => updateField("color", event.target.value)}
             placeholder="Color"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
           <input
@@ -1338,7 +1715,7 @@ function AdminPage() {
             value={form.display}
             onChange={(event) => updateField("display", event.target.value)}
             placeholder="Display, for example 6.8-inch AMOLED"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
           <input
@@ -1348,7 +1725,7 @@ function AdminPage() {
             value={form.camera}
             onChange={(event) => updateField("camera", event.target.value)}
             placeholder="Camera, for example 200 MP"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
           <input
@@ -1358,7 +1735,7 @@ function AdminPage() {
             value={form.battery}
             onChange={(event) => updateField("battery", event.target.value)}
             placeholder="Battery, for example 5000 mAh"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
           <input
@@ -1368,7 +1745,7 @@ function AdminPage() {
             value={form.processor}
             onChange={(event) => updateField("processor", event.target.value)}
             placeholder="Processor"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500"
           />
 
           <input
@@ -1378,22 +1755,29 @@ function AdminPage() {
             value={form.storage}
             onChange={(event) => updateField("storage", event.target.value)}
             placeholder="Storage, for example 256 GB"
-            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none focus:border-blue-500 md:col-span-2"
+            className="rounded-xl border border-white/10 bg-black/30 p-3 outline-none transition focus:border-blue-500 md:col-span-2"
           />
 
-          {isEditing && currentImage && (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 md:col-span-2">
-              <p className="mb-3 text-sm font-semibold text-slate-300">
-                Current mobile image
-              </p>
+          <AnimatePresence>
+            {isEditing && currentImage && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4 md:col-span-2"
+              >
+                <p className="mb-3 text-sm font-semibold text-slate-300">
+                  Current mobile image
+                </p>
 
-              <img
-                src={getImageUrl(currentImage)}
-                alt={form.name}
-                className="h-56 w-full rounded-2xl object-contain"
-              />
-            </div>
-          )}
+                <img
+                  src={getImageUrl(currentImage)}
+                  alt={form.name}
+                  className="h-56 w-full rounded-2xl object-contain"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <label className="md:col-span-2">
             <span className="mb-2 block text-sm font-semibold text-slate-300">
@@ -1412,13 +1796,22 @@ function AdminPage() {
             />
           </label>
 
-          {selectedImage && (
-            <p className="text-sm text-emerald-400 md:col-span-2">
-              Selected image: {selectedImage.name}
-            </p>
-          )}
+          <AnimatePresence>
+            {selectedImage && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-sm text-emerald-400 md:col-span-2"
+              >
+                Selected image: {selectedImage.name}
+              </motion.p>
+            )}
+          </AnimatePresence>
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={isSubmitting}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 p-3 font-bold transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2"
@@ -1432,10 +1825,21 @@ function AdminPage() {
               : isEditing
                 ? "Update mobile and view in shop"
                 : "Add mobile and view in shop"}
-          </button>
+          </motion.button>
 
-          {message && <p className="text-red-400 md:col-span-2">{message}</p>}
-        </form>
+          <AnimatePresence>
+            {message && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden text-red-400 md:col-span-2"
+              >
+                {message}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </motion.form>
 
         <section className="mt-14">
           <div className="flex items-center justify-between">
@@ -1447,58 +1851,83 @@ function AdminPage() {
           </div>
 
           {isLoading ? (
-            <div className="mt-6 rounded-2xl border border-white/10 p-8 text-center text-slate-400">
-              Loading mobiles...
+            <div className="mt-6 space-y-3">
+              {[0, 1, 2].map((index) => (
+                <div
+                  key={index}
+                  className="h-24 animate-pulse rounded-2xl border border-white/10 bg-white/[0.03]"
+                />
+              ))}
             </div>
           ) : phones.length === 0 ? (
             <div className="mt-6 rounded-2xl border border-dashed border-white/20 p-8 text-center text-slate-400">
               No mobiles have been added.
             </div>
           ) : (
-            <div className="mt-6 space-y-3">
-              {phones.map((phone) => (
-                <div
-                  key={phone.id}
-                  className={`flex items-center gap-4 rounded-2xl border p-4 ${
-                    editId === phone.id
-                      ? "border-blue-500 bg-blue-500/10"
-                      : "border-white/10 bg-white/[0.03]"
-                  }`}
-                >
-                  <img
-                    src={getImageUrl(phone.image)}
-                    alt={phone.name}
-                    className="h-16 w-16 rounded-xl object-cover"
-                  />
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold">{phone.name}</p>
-                    <p className="text-sm text-slate-500">
-                      {phone.series} · {formatPrice(phone.price)}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => beginEditing(phone)}
-                    className="rounded-xl bg-blue-500/15 p-3 text-blue-400 transition hover:bg-blue-500/25"
-                    aria-label={`Edit ${phone.name}`}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.05 } },
+              }}
+              className="mt-6 space-y-3"
+            >
+              <AnimatePresence>
+                {phones.map((phone) => (
+                  <motion.div
+                    layout
+                    key={phone.id}
+                    variants={{
+                      hidden: { opacity: 0, x: -20 },
+                      visible: { opacity: 1, x: 0 },
+                    }}
+                    exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
+                    className={`flex items-center gap-4 rounded-2xl border p-4 transition-colors ${
+                      editId === phone.id
+                        ? "border-blue-500 bg-blue-500/10"
+                        : "border-white/10 bg-white/[0.03]"
+                    }`}
                   >
-                    <Pencil size={19} />
-                  </button>
+                    <img
+                      src={getImageUrl(phone.image)}
+                      alt={phone.name}
+                      className="h-16 w-16 rounded-xl object-cover"
+                    />
 
-                  <button
-                    type="button"
-                    disabled={deletingId === phone.id}
-                    onClick={() => deleteMobile(phone.id)}
-                    className="rounded-xl bg-red-500/15 p-3 text-red-400 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label={`Delete ${phone.name}`}
-                  >
-                    <Trash2 size={19} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold">{phone.name}</p>
+                      <p className="text-sm text-slate-500">
+                        {phone.series} · {formatPrice(phone.price)}
+                      </p>
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.92 }}
+                      type="button"
+                      onClick={() => beginEditing(phone)}
+                      className="rounded-xl bg-blue-500/15 p-3 text-blue-400 transition hover:bg-blue-500/25"
+                      aria-label={`Edit ${phone.name}`}
+                    >
+                      <Pencil size={19} />
+                    </motion.button>
+
+                    <motion.button
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.92 }}
+                      type="button"
+                      disabled={deletingId === phone.id}
+                      onClick={() => deleteMobile(phone.id)}
+                      className="rounded-xl bg-red-500/15 p-3 text-red-400 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`Delete ${phone.name}`}
+                    >
+                      <Trash2 size={19} />
+                    </motion.button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
           )}
         </section>
       </main>
@@ -1506,13 +1935,29 @@ function AdminPage() {
   );
 }
 
-export default function App() {
+function AnimatedRoutes() {
+  const location = useLocation();
+
   return (
-    <Routes>
-      <Route path="/" element={<Shop />} />
-      <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/admin" element={<AdminPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Routes location={location}>
+          <Route path="/" element={<Shop />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </motion.div>
+    </AnimatePresence>
   );
+}
+
+export default function App() {
+  return <AnimatedRoutes />;
 }
