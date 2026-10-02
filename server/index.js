@@ -32,7 +32,7 @@ if (!MONGODB_URI) {
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://ishita-mobiles.vercel.app"],
+    origin: ["http://localhost:5173", "https://ishita-mobiles-5ora.vercel.app"],
   }),
 );
 
