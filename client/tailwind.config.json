@@ -1,0 +1,9 @@
+{
+  "theme": {
+    "extend": {
+      "screens": {
+        "xs": "400px"
+      }
+    }
+  }
+}
